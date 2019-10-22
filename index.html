@@ -1,0 +1,574 @@
+<html>
+<head>
+    <meta charset="utf-8">
+	<style>
+		body
+		{
+			background-color: #DEDDE5
+		}
+		table
+		{
+			font-size: xx-large;
+		}
+		.RightTD
+		{
+			background-color: #f88
+		}
+		.selectable
+		{
+			background-color: #9999FF
+		}
+		.selected
+		{
+			background-color: #f54141
+		}
+		#list
+		{
+			Width: 100%;
+		}
+	</style>
+	<script src="jquery-3.4.1.min.js" >
+	</script>
+	<script>
+	
+    /**
+     * Проверка видимости элемента (в видимой части страницы)
+     * Достаточно, чтобы верхний или нижний край элемента был виден
+     */
+    function isVisible(elem) {
+
+      let coords = elem.getBoundingClientRect();
+
+      let windowHeight = document.documentElement.clientHeight;
+
+      // видны верхний ИЛИ нижний край элемента
+      let topVisible = coords.top > 0 && coords.top < windowHeight;
+      let bottomVisible = coords.bottom < windowHeight && coords.bottom > 0;
+
+      return topVisible || bottomVisible;
+    }
+
+    /**
+    Вариант проверки, считающий элемент видимым,
+    если он не более чем -1 страница назад или +1 страница вперед.
+
+    function isVisible(elem) {
+
+      let coords = elem.getBoundingClientRect();
+
+      let windowHeight = document.documentElement.clientHeight;
+
+      let extendedTop = -windowHeight;
+      let extendedBottom = 2 * windowHeight;
+
+      // top visible || bottom visible
+      let topVisible = coords.top > extendedTop && coords.top < extendedBottom;
+      let bottomVisible = coords.bottom < extendedBottom && coords.bottom > extendedTop;
+
+      return topVisible || bottomVisible;
+    }
+    */
+
+    function showVisible() {
+      for (let img of document.querySelectorAll('img')) {
+        let realSrc = img.dataset.src;
+        if (!realSrc) continue;
+
+        if (isVisible(img)) {
+          // отключение кеширования
+          // эта строка должна быть удалена в "боевом" коде
+          realSrc += '?nocache=' + Math.random();
+
+          img.src = realSrc;
+
+          img.dataset.src = '';
+        }
+      }
+    }
+  
+	
+		function ShowError()
+		{
+			document.getElementsByTagName("Body")[0].innerHTML = "Ошибка соединения";
+				State = State + 9;
+		}
+		var State = 0;
+	
+		function GetAjax(URL)
+		{
+			if (URL == null)
+			{
+				return null;
+			}
+			var ret;
+			$.ajax({
+			
+			url: URL,
+			async: false,
+			//dataType: JSON,
+			success: function(data)
+			{
+				ret = data;
+			},
+			error:function(data){ShowError();}
+			})
+			return ret;
+		}
+	
+		function GetImg(URL)
+		{
+			if (URL == null)
+			{
+				return null;
+			}
+			var ret;
+			$.ajax({
+			
+			url: URL,
+			async: false,
+			//dataType: JSON,
+			success: function(data)
+			{
+				ret = data;
+			},
+			error:function(data){ShowError();}
+			})
+			return ret;
+		}
+		
+		function GetItem(type, id)
+		{
+			if (Array.isArray(repository[type]))
+			{
+				for(let i = 0; i < repository[type].length; i++)
+				{
+					if (repository[type][i].id == id)
+						return repository[type][i];
+				}
+				let item = GetAjax('https://swapi.co/api/' + type + '/' + id + '?format=json');
+				repository[type][repository[type].length] = item;
+				return item;
+			}
+			repository[type] = [];
+			repository[type][0] = GetAjax('https://swapi.co/api/' + type + '/' + id + '?format=json');
+			return repository[type][0];
+		}
+		
+		function GetList(type)
+		{
+			let list;
+			if (repository[type] != null)
+			{
+				list = repository[type];
+			}
+			else
+			{
+				list = [];
+				var exit = true;
+				for(var item = GetAjax('https://swapi.co/api/' + type + '?format=json'); exit;exit = item != null)
+				{
+					if (Array.isArray( item.results))
+					{
+						for(let i = 0; i < item.results.length; i++)
+						{
+							list[list.length] = item.results[i];
+							if(typeof item.results[i].url === 'string')
+							{
+								let arr = item.results[i].url.split('/');
+								if (arr.length - 2 > 0)
+								{								
+									list[i].id = arr[arr.length - 2];
+								}
+							}
+						}
+					}
+					item = GetAjax(item.next);
+				}
+				repository[type] = list;
+			}
+			return list;
+		}
+		function standby()
+		{
+			document.getElementById('image').src = 'no-image-found-360x250.png';
+		}
+		function ShowItem(Item, type)
+		{
+			State = 4;
+			selectedItem = 0;
+			selectableItems = [];
+            let table = document.createElement("table");
+			table.id = "list";
+			let figure = document.createElement("figure");
+			
+            let img = document.createElement("img");
+			img.setAttribute("src", "placeholder.svg");
+			img.setAttribute("id", "image");
+			img.setAttribute("data-src", "https://starwars-visualguide.com/assets/img/" + type + "/" + Item.id + ".jpg");
+			img.setAttribute("onerror","standby()");
+			img.setAttribute("Width", "300px");
+			img.setAttribute("Height", "200px");
+			figure.appendChild(img);
+            for(let key in Item)
+            {
+                let str = document.createElement("tr");
+                table.appendChild(str);
+                let lc = document.createElement("td");
+                let rc = document.createElement("td");
+				rc.classList.add("RightTD");
+                let keyCol = document.createTextNode(key);
+                lc.appendChild(keyCol);
+				let valueCol;
+				if (Array.isArray(Item[key]))
+				{
+					valueCol = document.createElement("ul");
+					for(let i = 0; i < Item[key].length; i++)
+					{
+						let li = document.createElement("li");
+						if (IsUrl(Item[key][i]))
+						{
+							var subItem = GetAjax(Item[key][i])
+							selectableItems[selectableItems.length] = subItem;
+							li.innerText = GetTitle(subItem);
+							li.classList.add("selectable");
+							//li = document.createTextNode(Item[key]);
+						}
+						else
+						{
+							li.innerText = document.createTextNode(Item[key][i]);
+						}
+						valueCol.appendChild(li);
+					}
+				}
+				else
+				{
+					valueCol = document.createTextNode(Item[key]);
+				}
+                rc.appendChild(valueCol);
+                str.appendChild(lc);
+                str.appendChild(rc);
+            }
+			document.getElementsByTagName("Body")[0].innerHTML = "";
+            document.getElementsByTagName("Body")[0].appendChild(figure);
+            document.getElementsByTagName("Body")[0].appendChild(table);
+			SelectSubItem(selectedItem);
+			showVisible();
+		}
+				
+			
+		function GetTitle(Item)
+		{
+			if (Item.name != null)
+				return Item.name;
+			if (Item.title != null)
+				return Item.title;
+			return Item.url;
+		}
+				
+		
+		var selectedItem = 0;
+		var selectedType;
+		var selectableItems = [];
+		
+		function IsUrl(str)
+		{
+			var expression = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi;
+			var regex = new RegExp(expression);
+			return str.match(regex);
+		}
+		
+		
+		function ShowList20(list, type, offset)
+		{
+			let _offset = 0;
+			if (offset != null)
+				_offset = offset;
+			let table = document.createElement("table");
+			table.id = "list";
+			selectableItems = [];
+			let str = document.createElement("tr");
+			for(let i = _offset; i < Math.min(list.length, _offset + 20); i++)
+			{
+				let lc = document.createElement("td");
+				lc.classList.add("selectable");
+				lc.id = type + "_" + list[i].id;
+				selectableItems[selectableItems.length] = type + "_" + list[i].id;
+				let keyCol = document.createTextNode(GetTitle(list[i]));
+				lc.appendChild(keyCol);
+				str.appendChild(lc);
+				if (i % 2 == 1 || i == Math.min(list.length - 1, _offset + 19))
+				{
+					table.appendChild(str);
+					str = document.createElement("tr");
+				}				
+			}
+			State = 3;
+			selectableItems[selectableItems.length] = "back";
+			document.getElementsByTagName("Body")[0].innerHTML = "";
+			document.getElementsByTagName("Body")[0].appendChild(table);
+			currentList = list;
+		}
+		
+		function ShowList(list, type, offset)
+		{
+			ShowList20(list, type, offset);
+			SelectItem(selectedItem);
+		}
+		
+		function SelectType(pointer)
+		{
+			var a = document.getElementById("type_" + selectedType);
+			if (a != null)
+				if (a.classList != null)
+					if (a.classList.contains("selected"))
+						a.classList.remove("selected");
+			
+			selectedType = pointer;
+			document.getElementById("type_" + selectedType).classList.add("selected");
+			selectedItem = 0;
+		}
+		
+		function SelectSubItem(pointer)
+		{
+			var a = document.getElementsByClassName("selectable")[selectedItem];
+			if (a != null)
+				if (a.classList != null)
+					if (a.classList.contains("selected"))
+						a.classList.remove("selected");
+			selectedItem = pointer;
+			
+			document.getElementsByClassName("selectable")[selectedItem].classList.add("selected");
+		}
+		
+		
+		function SelectItem(pointer)
+		{
+			var a = document.getElementById(types[selectedType] + "_" + repository[types[selectedType]][selectedItem].id);
+			if (a != null)
+				if (a.classList != null)
+					if (a.classList.contains("selected"))
+						a.classList.remove("selected");
+			let old = selectedItem;
+			selectedItem = pointer;
+			
+			if (Math.floor(old  / 20) !=  Math.floor(pointer / 20))
+			{
+				ShowList(repository[types[selectedType]], types[selectedType], Math.floor(pointer / 20) * 20);
+			}
+			document.getElementById(types[selectedType] + "_" + repository[types[selectedType]][selectedItem].id).classList.add("selected");
+		}
+		
+		function ShowMenu()
+		{
+			State = 0;
+			var table = document.createElement("table");
+			table.id = "list";
+			table.style.Width = "100%";
+			let tr = document.createElement("tr");
+			for(var key in types)
+			{
+				var lc = document.createElement("td");
+				lc.id = "type_" + key;
+				lc.classList.add("selectable");
+				var keyCol = document.createTextNode(types[key]);
+				lc.appendChild(keyCol);
+				tr.appendChild(lc);
+				if (key % 3 == 2)
+				{
+					table.appendChild(tr);
+					tr = document.createElement("tr");
+				}
+			}
+			document.getElementsByTagName("Body")[0].innerHTML = "";
+			document.getElementsByTagName("Body")[0].appendChild(table);
+			SelectType(0);
+		}
+		
+		function OnArrowRight()
+		{
+			switch (State)
+			{
+				case 0:
+					if (selectedType % 3 < 2)
+						SelectType(selectedType + 1)
+				break;
+				case 1:
+				break;
+				case 2:
+					if (selectedItem % 3 < 2 || selectedItem < repository[types[selectedType]].length)
+						SelectItem(selectedItem + 1);
+				break;
+				case 3:
+					if (selectedItem % 2 == 0)
+						SelectItem(selectedItem + 1);
+					else
+						if (selectedItem + 20 < repository[types[selectedType]].length)
+							SelectItem(selectedItem + 19);
+				break;
+			}
+		}
+		
+		function OnArrowUp()
+		{
+			switch (State)
+			{
+				case 0:
+					if (selectedType >= 3)
+						SelectType(selectedType - 3)
+				break;
+				case 1:
+					if (selectedItem != 0)
+						SelectItem(selectedItem - 1)
+				break;
+				case 2:
+					if (selectedItem > 2 || selectedItem - 3 >= 0)
+						SelectItem(selectedItem - 3);
+				break;
+				case 3:
+					if (selectedItem % 20 > 1)
+						SelectItem(selectedItem - 2);
+				break;
+				case 4:
+					if (selectedItem > 0)
+						SelectSubItem(selectedItem-1);
+				break;
+			}
+		}
+		
+		function OnArrowDown()
+		{
+			switch (State)
+			{
+				case 0:
+					if (selectedType < 3)
+						SelectType(selectedType + 3)
+				break;
+				case 1:
+					if (selectedItem + 1 != repository[types[selectedType]].length)
+						SelectItem(selectedItem + 1)
+				break;
+				case 2:
+					if (selectedItem < 6 || selectedItem + 3 < repository[types[selectedType]].length)
+						SelectItem(selectedItem + 3);
+				break;
+				case 3:
+					if (selectedItem + 2 < 20 * (Math.floor(selectedItem / 20) + 1) && selectedItem + 2 < repository[types[selectedType]].length)
+						SelectItem(selectedItem + 2);
+				break;
+				case 4:
+					if (selectedItem + 1 < document.getElementsByClassName("selectable").length)
+						SelectSubItem(selectedItem + 1);
+				break;
+			}
+		}
+		
+		function OnArrowLeft()
+		{
+			switch (State)
+			{
+				case 0:
+					if (selectedType % 3 > 0)
+						SelectType(selectedType - 1)
+				break;
+				case 1:
+				break;
+				case 2:
+					if (selectedItem % 3 != 0 || selectedItem - 1 != 0)
+						SelectItem(selectedItem - 1);
+				break;
+				case 3:
+					if (selectedItem % 2 == 1)
+						SelectItem(selectedItem - 1);
+					else
+						if (selectedItem % 2 == 0 && selectedItem - 19 > 0)
+							SelectItem(selectedItem - 19);
+				break;
+			}
+		}
+		
+		function OnEnter()
+		{
+			switch (true)
+			{
+				case (State == 0):
+					let list = GetList(types[selectedType]);
+					for(let i = 0; i < list.length; i++)
+					{
+						if(typeof list[i].url === 'string')
+						{
+							let arr = list[i].url.split('/');
+							if (arr.length - 2 > 0)
+							{								
+								list[i].id = arr[arr.length - 2];
+							}
+						}
+					}
+					ShowList(list, types[selectedType]);
+				break;
+				case (State <= 3 && State > 0):
+					ShowItem(GetList(types[selectedType])[selectedItem],types[selectedType]);
+				break;
+				case (State == 4):
+					ShowItem(selectableItems[selectedItem],types[selectedType]);
+				break;
+				case (State > 8):
+					ShowMenu();
+			}
+		}
+		
+		function OnBackspace()
+		{
+			switch (true)
+			{
+				case (State == 0):
+				break;
+				case (State <= 3 && State > 0):
+					ShowMenu();
+				break;
+				case (State == 4):
+					ShowList(repository[types[selectedType]], types[selectedType], 0);
+				break;
+				case (State > 8):
+					ShowMenu();
+				break;
+			}
+		}
+		
+		function handler(event)
+		{
+			switch(event.code)
+			{
+				case "ArrowUp":
+					OnArrowUp();
+				break;
+				case "ArrowDown":
+					OnArrowDown();
+				break;
+				case "ArrowLeft":
+					OnArrowLeft();
+				break;
+				case "ArrowRight":
+					OnArrowRight();
+				break;
+				case "Enter":
+					OnEnter();
+				break;
+				case "Backspace":
+					OnBackspace();
+				break;
+			}
+		}
+		
+		var types = ["planets","starships","vehicles","people","films","species"];
+		var repository = {};
+		function INI()
+		{
+			ShowMenu();
+		}
+	</script>
+</head>
+
+<body onload="INI()" onkeydown="handler(event)">
+
+</body>
+</html>
